@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Defibrillator Locations</title>
+
+</head>
+
+<body>
+    <style>
+        .spinner {
+        font-size: 20px;
+        text-align: center;
+        padding: 50px;
+        position: absolute;  
+        top: 50%;            
+        left: 50%;           
+        transform: translate(-50%, -50%);  
+        background-color: rgba(255, 255, 255, 0.8);  
+        }
+
+    </style>
+
+    <div id="map" style="height: 500px; width: 100%;"></div>
+    <button id="toggleTracking">Start Tracking</button>
+    <button id="stopTracking">Stop Tracking</button>
+    <button id="callAmbulance">Call Ambulance</button>
+    <button id="sendSMSThroughUserPhone">Alert Ambulance</button>
+    <button id="findClosestDefibrillator">Find Closest Defibrillator</button>
+
+    <div id="loadingSpinner" class="spinner" style="display: none;">
+        Calculating directions...
+    </div>
+    
+
+
+    <script>
+   
+
+    
+
+        let defibrillators = <%- JSON.stringify(markers) %>;
+        let watchID;
+        let isTracking = false;
+        let map;
+
+        function initMap() {
+            const center = { lat: 49.183754, lng: -2.104754 };
+            map = new google.maps.Map(document.getElementById('map'), {
+                zoom: 14,
+                center: center
+            });
+
+            const myHeart = {
+                url: '/icons/heart.png',
+                scaledSize: new google.maps.Size(25, 25)
+            };
+
+            defibrillators.forEach(location => {
+                const marker = new google.maps.Marker({
+                    position: { lat: location.Latitude, lng: location.Longitude },
+                    map: map,
+                    title: location.Address,
+                    icon: myHeart
+                });
+
+                const infoWindow = new google.maps.InfoWindow({
+                    content: `
+                        <strong>${location.Address}</strong><br>
+                        ${location.Streetname}<br>
+                        ${location.Parish}, ${location.Postcode}<br>
+                        Notes: ${location.Notes}
+                    `
+                });
+
+                marker.addListener('click', () => {
+                    infoWindow.open(map, marker);
+                });
+            });
+        }
+
+        function calculateClosestDefibrillator(userLocation, defibrillators) {
+            let closestDefibrillator = null;
+            let shortestDistance = Infinity;
+            
+            defibrillators.forEach(defibrillator => {
+                const defibrillatorLocation = new google.maps.LatLng(defibrillator.Latitude, defibrillator.Longitude);
+                const distance = google.maps.geometry.spherical.computeDistanceBetween(userLocation, defibrillatorLocation);
+
+                if (distance < shortestDistance) {
+                    shortestDistance = distance;
+                    closestDefibrillator = defibrillator;
+                }
+            });
+
+            return closestDefibrillator;
+        }
+        function showSpinner() {
+            document.getElementById('loadingSpinner').style.display = 'block';
+        }
+
+        function hideSpinner() {
+            setTimeout(() => {  // Delay hiding the spinner for 2 seconds (for testing)
+            document.getElementById('loadingSpinner').style.display = 'none';
+            }, 2000);
+        }
+
+
+        function showDirections(userLocation, defibrillatorLocation) {
+            const directionsService = new google.maps.DirectionsService();
+            const directionsRenderer = new google.maps.DirectionsRenderer();
+            directionsRenderer.setMap(map);
+
+            const request = {
+                origin: userLocation,
+                destination: new google.maps.LatLng(defibrillatorLocation.Latitude, defibrillatorLocation.Longitude),
+                travelMode: 'WALKING'
+            };
+            
+            // Show the spinner before starting the directions calculation
+            
+            
+            directionsService.route(request, function(result, status) {
+            // Hide the spinner once the directions are received or if there's an error
+            hideSpinner();
+                if (status == 'OK') {
+                    directionsRenderer.setDirections(result);
+                } else {
+                    console.error("Directions request failed with status: " + status);
+                }
+            });
+        }
+
+        document.getElementById('toggleTracking').addEventListener('click', function() {
+            if (!isTracking) {
+                watchID = navigator.geolocation.watchPosition(function(position) {
+                    const userLocation = new google.maps.LatLng(position.coords.latitude, position.coords.longitude);
+                    map.setCenter(userLocation);
+
+                    new google.maps.Marker({
+                        position: userLocation,
+                        map: map,
+                        title: 'Your Location',
+                        icon: '/icons/user.png'
+                    });
+                }, function(error) {
+                    console.log('Error occurred. Error code: ' + error.code);
+                });
+
+                alert("Location tracking started.");
+                this.textContent = "Stop Tracking";
+                isTracking = true;
+            }
+        });
+
+        document.getElementById('stopTracking').addEventListener('click', function() {
+            if (isTracking) {
+                navigator.geolocation.clearWatch(watchID);
+                alert("Location tracking stopped.");
+                document.getElementById('toggleTracking').textContent = "Start Tracking";
+                isTracking = false;
+            }
+        });
+
+        document.getElementById('callAmbulance').addEventListener('click', function() {
+            window.location.href = "tel:911"; // Replace 911 with your local emergency number
+        });
+
+        document.getElementById('sendSMSThroughUserPhone').addEventListener('click', function() {
+            if (isTracking) {
+                navigator.geolocation.getCurrentPosition(function(position) {
+                    const userLocation = new google.maps.LatLng(position.coords.latitude, position.coords.longitude);
+                    const ambulanceNumber = "YOUR_AMBULANCE_SERVICE_NUMBER"; // Replace with your ambulance service number
+                    const message = `Emergency! User coordinates are Latitude: ${userLocation.lat()}, Longitude: ${userLocation.lng()}`;
+                    
+                    window.location.href = `sms:${ambulanceNumber}?body=${encodeURIComponent(message)}`;
+                }, function(error) {
+                    console.error("Error obtaining location: ", error);
+                    alert("Error obtaining location. Please ensure location services are enabled.");
+                });
+            } else {
+                alert('Please enable location tracking to send coordinates.');
+            }
+        });
+
+        document.getElementById('findClosestDefibrillator').addEventListener('click', function() {
+            if (isTracking) {
+                showSpinner();
+                navigator.geolocation.getCurrentPosition(function(position) {
+                    const userLocation = new google.maps.LatLng(position.coords.latitude, position.coords.longitude);
+                    const closestDefibrillator = calculateClosestDefibrillator(userLocation, defibrillators);
+
+                    if (closestDefibrillator) {
+                        showDirections(userLocation, closestDefibrillator);
+                    } else {
+                        alert('No defibrillator found nearby.');
+                    }
+                });
+            } else {
+                alert('Please enable location tracking to find the closest defibrillator.');
+            }
+        });
+
+    </script>
+
+    <!-- Load the Google Maps JavaScript API with the callback parameter and geometry library -->
+    <script src="https://maps.googleapis.com/maps/api/js?key=<%= apiKey %>&callback=initMap&libraries=geometry"></script>
+
+</body>
+
+</html>

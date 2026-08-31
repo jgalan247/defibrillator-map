@@ -1,0 +1,30 @@
+<!DOCTYPE html> 
+<html> 
+<head> 
+	<title>Home Page</title> 
+	<style type="text/css" media="screen"> 
+		body { 
+			background-color: skyblue; 
+			text-decoration-color: white; 
+			font-size: 1em; 
+		} 
+	</style> 
+</head> 
+<script>
+	let defibrillators = <%- JSON.stringify(markers) %>;
+
+</script>
+<body> 
+	<p> <%- JSON.stringify(markers) %></p>
+	Hobbies of <%=markers.parish%> are:<br /> 
+    <p><%- markers.address%></p>
+
+		<ul> 
+			<% markers.forEach((item)=>{%> 
+				<li> 
+					<%=item%> 
+				</li> 
+				<%});%> 
+		</ul> 
+</body> 
+</html>

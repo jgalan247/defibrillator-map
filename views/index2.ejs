@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Defibrillator Locations</title>
+    <script src="https://maps.googleapis.com/maps/api/js?key=<%= apiKey %>"></script>
+</head>
+<body>
+
+<div id="map" style="height: 500px; width: 100%;"></div>
+
+<script>
+
+ // Embed the locations data directly into the page
+    let defibrillators = <%- JSON.stringify(markers) %>;
+    let watchID;
+    let isTracking = false;
+
+    function initMap() {
+        const center = { lat: 49.183754, lng: -2.104754 }; // Example center, you might want to dynamically calculate this based on your locations
+        const map = new google.maps.Map(document.getElementById('map'), {
+            zoom: 14,
+            center: center
+        });
+
+        const myHeart = {
+            url: '/icons/heart.png', // path to the icon image
+            scaledSize: new google.maps.Size(25, 25) // desired size
+        };
+
+        const myUser = {
+            url: '/icons/user.png', // path to the icon image
+            scaledSize: new google.maps.Size(25, 25) // desired size
+        };
+
+
+
+        // Loop through the locations and place markers on the map
+        
+        defibrillators.forEach(location => {
+           // console.log(location.latitude);
+            
+            const marker = new google.maps.Marker({
+                position: { lat: location.Latitude, lng: location.Longitude },
+                map: map,
+                title: location.Address,
+                icon: myHeart
+            
+            });
+
+            // Optional: Add an info window to each marker to display more details
+            const infoWindow = new google.maps.InfoWindow({
+                content: `
+                    <strong>${location.Address}</strong><br>
+                    ${location.Streetname}<br>
+                    ${location.Parish}, ${location.Postcode}<br>
+                    Notes: ${location.Notes}
+                `
+            });
+        
+            marker.addListener('click', () => {
+                infoWindow.open(map, marker);
+            });
+            
+        });
+
+    document.getElementById('toggleTracking').addEventListener('click', function() {
+    if (isTracking) {
+        navigator.geolocation.clearWatch(watchID);
+        alert("Location tracking stopped.");
+        this.textContent = "Start Tracking";
+        isTracking = false;
+    } else {
+        watchID = navigator.geolocation.watchPosition(function(position) {
+            const userLocation = {
+                lat: position.coords.latitude,
+                lng: position.coords.longitude
+            };
+
+        if ("geolocation" in navigator) {
+            navigator.geolocation.getCurrentPosition(function(position) {
+            const userLocation = {
+                lat: position.coords.latitude,
+                lng: position.coords.longitude
+        };
+
+        // Center the map to user's location
+        map.setCenter(userLocation);
+
+        // Add a marker for the user's location
+        new google.maps.Marker({
+            position: userLocation,
+            map: map,
+            title: 'Your Location',
+            icon: '/icons/user.png'
+            //animation: google.maps.Animation.BOUNCE
+        });
+        } , function(error) {
+        console.log('Error occurred. Error code: ' + error.code);
+        // Handle errors here
+    });
+        } else {
+            console.log("Geolocation is not supported by this browser.");
+        }
+
+    });
+        alert("Location tracking started.");
+        this.textContent = "Stop Tracking";
+        isTracking = true;
+    }
+
+    // Initialize the map once the page has loaded
+    window.onload = initMap;
+    document.getElementById('callAmbulance').addEventListener('click', function() {
+    // Handle the button click here
+    window.location.href = "tel:911";  // Replace 911 with your local emergency number
+
+    });
+</script>
+<button id="callAmbulance">Call Ambulance</button>
+
+</body>
+</html>
